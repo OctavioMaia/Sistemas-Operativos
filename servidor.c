@@ -10,11 +10,15 @@
 #include <stdlib.h>
 
 int main(int argc, char* argv[]){
-	char *utilizador, PATH[100], PATH_DATA[100], PATH_META[100], PATH_ATUAL[1024], INPUT[1024], ch;
-	int fd, i;
+	char *utilizador, PATH[100], PATH_DATA[100], PATH_META[100], PATH_ATUAL[1024], FICHEIRO[100], DECISAO[100], ch;
+	char resposta[100], pedido[100];
+	int fd_resposta=0, fd_pedido=0, pid, i;
 	struct stat fileStat;
 
 	utilizador = (char *)getenv("USER");
+	char* command, file;
+
+
 	sprintf(PATH, "/home/%s/.Backup",utilizador);
 	sprintf(PATH_DATA,"/home/%s/.Backup/data",utilizador);
 	sprintf(PATH_META,"/home/%s/.Backup/metadata",utilizador);
@@ -26,27 +30,31 @@ int main(int argc, char* argv[]){
 	if (stat(PATH_META, &fileStat) == -1)
     	mkdir(PATH_META, 0700);
 
+ 	mkfifo("pipe_pedido",0666);
+ 	mkfifo("pipe_resposta",0666);
 
- 	mkfifo("fifo",0666);
-	getcwd(PATH_ATUAL, sizeof(PATH_ATUAL));
-	fd=open("fifo",O_RDONLY);
+	//getcwd(PATH_ATUAL, sizeof(PATH_ATUAL));
+	fd_pedido=open("pipe_pedido",O_RDONLY);
+	fd_resposta=open("pipe_resposta",O_WRONLY);
 
-	while(ch!='\n' && read(fd,&ch,1)!=0){
-		INPUT[i]=ch;
-		i++;
-	}
-	INPUT[i]='\0';
-	printf("Comando: %s\n",INPUT);   
+	read(fd_pedido,resposta,100);
+	pid = atoi(strtok(resposta, " "));
+    strcpy(DECISAO, strtok(NULL, " "));
+    strcpy(FICHEIRO, strtok(NULL, "\r\n"));
 
-	close(fd);
+	//printf("Comando: %s Ficheiro: %s",DECISAO,FICHEIRO);
 
-	if(strcmp(INPUT,"backup")==0){
-		printf("backup\n");
-	}else if(strcmp(INPUT,"restore")==0){
+	if(strcmp(DECISAO,"backup")==0){
+		printf("entrei backup\n");
+		doDigest(FICHEIRO);
+	}else if(strcmp(DECISAO,"restore")==0){
 		printf("restore\n");
 	}else{
 		printf("comando invalido\n");
 	}
+
+	close(fd_resposta);
+	close(fd_pedido);
 
 	return 0;
 }
