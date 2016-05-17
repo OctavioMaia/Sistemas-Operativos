@@ -9,9 +9,54 @@
 #include <string.h>
 #include <stdlib.h>
 
+#define MAX 512
+
+void kill_process(int pid){
+	kill(pid, SIGCONT);
+	kill(pid, SIGUSR2);
+}
+
+void doDigest(char *ficheiro){
+	int pipefd[2];
+	int flag = 0;
+	int n,i;
+	char buf[MAX], file[MAX], digest[MAX], aux[MAX];
+	pipe(pipefd);
+
+	if(fork()==0){
+		printf("cenas\n");
+		dup2(pipefd[1], 1);
+		close(pipefd[1]);
+		
+		execlp("sha1sum", "sha1sum", ficheiro, NULL);
+		
+		printf("executei sha1sum\n");
+		_exit(1);
+	}else{
+		close(pipefd[1]);
+		wait(&flag);
+		
+		if (WEXITSTATUS(flag) == 0) {
+		    n = (int) read(pipefd[0], buf, MAX);
+
+		    close(pipefd[0]);
+
+            strcpy(digest, strtok(buf, " "));
+		    strcpy(aux, strtok(NULL, "\r\n"));
+		    printf("aux %s\n",aux );
+		    
+		    for (; i < strlen(aux); i++)
+			    file[i - 1] = aux[i];
+		    
+		    //backup(digest, file, pid);
+		    //createMetadata(file, digest, pid);
+	    }
+	}
+}
+
 int main(int argc, char* argv[]){
-	char *utilizador, PATH[100], PATH_DATA[100], PATH_META[100], PATH_ATUAL[1024], FICHEIRO[100], DECISAO[100], ch;
-	char resposta[100], pedido[100];
+	char *utilizador, PATH[MAX], PATH_DATA[MAX], PATH_META[MAX], PATH_ATUAL[1024], FICHEIRO[MAX], DECISAO[MAX], ch;
+	char resposta[MAX], pedido[MAX];
 	int fd_resposta=0, fd_pedido=0, pid, i;
 	struct stat fileStat;
 
@@ -31,29 +76,28 @@ int main(int argc, char* argv[]){
     	mkdir(PATH_META, 0700);
 
  	mkfifo("pipe_pedido",0666);
- 	mkfifo("pipe_resposta",0666);
 
 	//getcwd(PATH_ATUAL, sizeof(PATH_ATUAL));
 	fd_pedido=open("pipe_pedido",O_RDONLY);
-	fd_resposta=open("pipe_resposta",O_WRONLY);
 
-	read(fd_pedido,resposta,100);
+	read(fd_pedido,resposta,MAX);
+
 	pid = atoi(strtok(resposta, " "));
     strcpy(DECISAO, strtok(NULL, " "));
-    strcpy(FICHEIRO, strtok(NULL, "\r\n"));
+    strcpy(FICHEIRO, strtok(NULL, "\n"));
 
 	//printf("Comando: %s Ficheiro: %s",DECISAO,FICHEIRO);
 
 	if(strcmp(DECISAO,"backup")==0){
 		printf("entrei backup\n");
 		doDigest(FICHEIRO);
+		kill_process(pid);
 	}else if(strcmp(DECISAO,"restore")==0){
 		printf("restore\n");
 	}else{
 		printf("comando invalido\n");
 	}
 
-	close(fd_resposta);
 	close(fd_pedido);
 
 	return 0;
