@@ -11,11 +11,6 @@
 
 #define MAX 512
 
-void kill_process(int pid){
-	kill(pid, SIGCONT);
-	kill(pid, SIGUSR2);
-}
-
 char* reverse(char* palavra){
 	char temp;
    	int i=0, j = strlen(palavra)-1;
@@ -30,7 +25,7 @@ char* reverse(char* palavra){
    	return palavra;
 }
 
-void backup(char * FICHEIRO, char* PATH, char *PATH_DATA, char * PATH_META){
+void backup(char * FICHEIRO, char* PATH, char *PATH_DATA, char * PATH_META,int pid){
 	int fd[2];
 	int flag = 0;
 	int fp_file = 0;
@@ -155,6 +150,51 @@ void backup(char * FICHEIRO, char* PATH, char *PATH_DATA, char * PATH_META){
 	}
 }
 
+void restore(char * FICHEIRO, char* PATH, char *PATH_DATA, char * PATH_META,int pid){
+	int fd[2];
+	char metaFicheiro[1024],cwd[1024],fichiroajuda[1024];
+	int fp1,fp2,status,xx;
+
+	getcwd(cwd, sizeof(cwd));
+	sprintf(metaFicheiro,"%s/%s",PATH_META,FICHEIRO);
+
+	if (access(metaFicheiro, F_OK) != -1) {	  
+		sprintf(fichiroajuda,"%s/%s",cwd,FICHEIRO);
+		if (xx=(fork()==0)) {
+			fp1 = open(metaFicheiro, O_RDONLY);
+		
+			dup2(fp1, 0);
+			close(fp1);
+			   
+			fp2 = open(fichiroajuda, O_CREAT | O_WRONLY, 0664);
+			
+			dup2(fp2, 1);
+			close(fp2);
+			
+			execlp("gunzip", "gunzip", NULL);
+
+			_exit(1);
+		}
+		else {
+			waitpid(xx,&status,0);
+
+			kill(pid, SIGCONT);
+
+			if (WEXITSTATUS(status) == 0) {
+				kill(pid, SIGUSR1);
+			}
+			else {
+				kill(pid, SIGUSR2);
+			}
+		}
+	}
+	else {
+		kill(pid, SIGCONT);
+		kill(pid, SIGUSR2);
+	}
+
+}
+
 int main(int argc, char* argv[]){
 	char *utilizador, PATH[MAX], PATH_DATA[MAX], PATH_META[MAX], PATH_ATUAL[1024], FICHEIRO[MAX], DECISAO[MAX], FIFO_PATH[MAX], ch;
 	char resposta[MAX], pedido[MAX];
@@ -196,9 +236,9 @@ int main(int argc, char* argv[]){
 	//printf("Comando: %s Ficheiro: %s",DECISAO,FICHEIRO);
 
 	if(strcmp(DECISAO,"backup")==0){
-		backup(FICHEIRO,PATH,PATH_DATA,PATH_META);
+		backup(FICHEIRO,PATH,PATH_DATA,PATH_META,pid);
 	}else if(strcmp(DECISAO,"restore")==0){
-		printf("restore\n");
+		restore(FICHEIRO,PATH,PATH_DATA,PATH_META,pid);
 	}else{
 		printf("comando invalido\n");
 	}
