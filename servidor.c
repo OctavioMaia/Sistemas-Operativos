@@ -25,20 +25,15 @@ char* reverse(char* palavra){
    	return palavra;
 }
 
-void backup(char * FICHEIRO, char* PATH, char *PATH_DATA, char * PATH_META,int pid){
-	int fd[2];
-	int flag = 0;
-	int fp_file = 0;
-	int fp_digest = 0;
-	int status;
+void backup(char * ficheiro, char* path, char *path_data, char * path_meta,int pid){
+	int fd[2],n, fp_file=0,fp_digest=0,status,f,i,fdCod,xx,a=0,encontrei=0;
 	FILE *fil;
-	int n,i,fdCod,xx,a=0,encontrei=0;
-	char buf[MAX], file[MAX], digest[MAX], * aux, divisao[1024], cod[128],codigo[1024], * tok,fichiroajuda[1024], *nameFile,cwd[1024],diretFicheiro[1024],dataFicheiro[1024],metaFicheiro[1024],* comparar;
-	char *string;
+	char  *string, *aux, divisao[1024], cod[128],codigo[1024],fichiroajuda[1024], *nameFile,cwd[1024],diretFicheiro[1024],dataFicheiro[1024],metaFicheiro[1024];
+
 	pipe(fd);
 
-	sprintf(codigo,"sha1sum %s",FICHEIRO);
-	printf("dadad%s\n",codigo);
+	sprintf(codigo,"sha1sum %s",ficheiro);
+	//printf("dadad%s\n",codigo);
 	fil=popen(codigo,"r");
 	fdCod=fileno(fil);
 	read(fdCod,cod,128);
@@ -48,11 +43,11 @@ void backup(char * FICHEIRO, char* PATH, char *PATH_DATA, char * PATH_META,int p
 
 	aux=(char *) strdup(cod);
 	nameFile=strsep(&aux," \t");
-	printf("nome do ficheiro %s\n",nameFile);
+	printf("digest: %s\n",nameFile);
 
-	sprintf(diretFicheiro,"%s/%s",cwd,FICHEIRO);
-	sprintf(dataFicheiro,"%s/%s",PATH_DATA,nameFile);
-	sprintf(metaFicheiro,"%s/%s",PATH_META,FICHEIRO);
+	sprintf(diretFicheiro,"%s/%s",cwd,ficheiro);
+	sprintf(dataFicheiro,"%s/%s",path_data,nameFile);
+	sprintf(metaFicheiro,"%s/%s",path_meta,ficheiro);
 
 
 	if(access(diretFicheiro, F_OK) == 0){
@@ -65,18 +60,20 @@ void backup(char * FICHEIRO, char* PATH, char *PATH_DATA, char * PATH_META,int p
 			pclose(fil);
 			aux=(char *) strdup(cod);
 			n = strlen(aux)-2;
+
 			while(encontrei==0){
-				if(aux[n]!='/')divisao[a++]=aux[n--];
-				else{
+				if(aux[n]!='/'){
+					divisao[a++]=aux[n--];
+				}else{
 					encontrei=1;
 				}
 			}
 			string = reverse(divisao);
 			if(strcmp(string,nameFile)!=0){
-				sprintf(fichiroajuda,"%s/%s",PATH_DATA,nameFile);
+				sprintf(fichiroajuda,"%s/%s",path_data,nameFile);
 				if(access(dataFicheiro,F_OK) == -1){
 					if(xx=(fork()==0)) {
-						fp_file = open(FICHEIRO, O_RDONLY,0664);
+						fp_file = open(ficheiro, O_RDONLY,0664);
 					   
 						dup2(fp_file,0);
 						close(fp_file);
@@ -88,37 +85,32 @@ void backup(char * FICHEIRO, char* PATH, char *PATH_DATA, char * PATH_META,int p
 						    
 						execlp("gzip", "gzip", NULL);
 						_exit(1);
-					}
-					else{
+					}else{
 						waitpid(xx,&status,0);
 					}
 				}
 				if(xx=(fork() == 0)) {        	
 					execlp("rm", "rm", metaFicheiro, NULL);
 					_exit(1);
-				}
-				else{
+				}else{
 					waitpid(xx,&status,0);
 					if(xx=(fork() == 0)) {        	
 						execlp("ln", "ln", "-s", fichiroajuda,metaFicheiro, NULL);
 						_exit(1);
-					}
-					else{
+					}else{
 						waitpid(xx,&status,0);
 					}
-					printf("sucesso\n");
+					printf("%s copiado com sucesso\n",ficheiro); //ficheiro foi mudado
 				}
+			}else{
+				printf("Já existe um backup deste ficheiro\n");
 			}
-			else{
-				printf("insucesso\n");
-			}
-		}
-		else{
-			sprintf(fichiroajuda,"%s/%s",PATH_DATA,nameFile);
+		}else{
+			sprintf(fichiroajuda,"%s/%s",path_data,nameFile);
 			if(access(dataFicheiro,F_OK) == -1){
-				sprintf(fichiroajuda,"%s/%s",PATH_DATA,nameFile);
+				sprintf(fichiroajuda,"%s/%s",path_data,nameFile);
 				if(xx=(fork()==0)) {
-					fp_file = open(FICHEIRO, O_RDONLY);
+					fp_file = open(ficheiro, O_RDONLY);
 				   
 					dup2(fp_file,0);
 					close(fp_file);
@@ -130,36 +122,33 @@ void backup(char * FICHEIRO, char* PATH, char *PATH_DATA, char * PATH_META,int p
 					    
 					execlp("gzip", "gzip", NULL);
 					_exit(1);
-				}
-				else{
+				}else{
 					waitpid(xx,&status,0);
 				}
 			}
 			if(xx=(fork() == 0)) {        	
 				execlp("ln", "ln", "-s", fichiroajuda,metaFicheiro, NULL);
 				_exit(1);
-			}
-			else{
+			}else{
 				waitpid(xx,&status,0);
 			}
-			printf("sucesso\n");
+			printf("%s copiado com sucesso\n",ficheiro);
 		}
-	}
-	else{
-		printf("insucesso\n");
+	}else{
+		printf("Ficheiro especificado não existe!\n");
 	}
 }
 
-void restore(char * FICHEIRO, char* PATH, char *PATH_DATA, char * PATH_META,int pid){
+void restore(char * ficheiro, char * path_meta,int pid){
 	int fd[2];
 	char metaFicheiro[1024],cwd[1024],fichiroajuda[1024];
 	int fp1,fp2,status,xx;
 
 	getcwd(cwd, sizeof(cwd));
-	sprintf(metaFicheiro,"%s/%s",PATH_META,FICHEIRO);
+	sprintf(metaFicheiro,"%s/%s",path_meta,ficheiro);
 
 	if (access(metaFicheiro, F_OK) != -1) {	  
-		sprintf(fichiroajuda,"%s/%s",cwd,FICHEIRO);
+		sprintf(fichiroajuda,"%s/%s",cwd,ficheiro);
 		if (xx=(fork()==0)) {
 			fp1 = open(metaFicheiro, O_RDONLY);
 		
@@ -196,53 +185,50 @@ void restore(char * FICHEIRO, char* PATH, char *PATH_DATA, char * PATH_META,int 
 }
 
 int main(int argc, char* argv[]){
-	char *utilizador, PATH[MAX], PATH_DATA[MAX], PATH_META[MAX], PATH_ATUAL[1024], FICHEIRO[MAX], DECISAO[MAX], FIFO_PATH[MAX], ch;
-	char resposta[MAX], pedido[MAX];
-	int fd_resposta=0, fd_pedido=0, pid, i;
+	char *utilizador, path[MAX], path_data[MAX], path_meta[MAX], ficheiro[MAX], decisao[MAX], path_fifo[MAX], ch, resposta[MAX];
+	int fd=0, pid, i;
 	struct stat fileStat;
 
 	utilizador = (char *)getenv("USER");
-	char* command, file;
+
+	sprintf(path, "/home/%s/.Backup",utilizador);
+	sprintf(path_data,"/home/%s/.Backup/data",utilizador);
+	sprintf(path_meta,"/home/%s/.Backup/metadata",utilizador);
+
+	if (stat(path, &fileStat) == -1)
+    	mkdir(path, 0700);
+	if (stat(path_data, &fileStat) == -1)
+    	mkdir(path_data, 0700);
+	if (stat(path_meta, &fileStat) == -1)
+    	mkdir(path_meta, 0700);
 
 
-	sprintf(PATH, "/home/%s/.Backup",utilizador);
-	sprintf(PATH_DATA,"/home/%s/.Backup/data",utilizador);
-	sprintf(PATH_META,"/home/%s/.Backup/metadata",utilizador);
+    sprintf(path_fifo,"%s/fifo",path);
+ 	mkfifo(path_fifo,0666);
 
-	if (stat(PATH, &fileStat) == -1)
-    	mkdir(PATH, 0700);
-	if (stat(PATH_DATA, &fileStat) == -1)
-    	mkdir(PATH_DATA, 0700);
-	if (stat(PATH_META, &fileStat) == -1)
-    	mkdir(PATH_META, 0700);
+	fd=open(path_fifo,O_RDONLY);
 
-
-    sprintf(FIFO_PATH,"%s/fifo",PATH);
- 	mkfifo(FIFO_PATH,0666);
-
-	//getcwd(PATH_ATUAL, sizeof(PATH_ATUAL));
-	fd_pedido=open(FIFO_PATH,O_RDONLY);
-
-	while(read(fd_pedido,&ch,1)!=0 && ch!='\n'){
+	
+	while(read(fd,&ch,1)!=0 && ch!='\n'){
 		resposta[i]=ch;
 		i++;
 	}
 	resposta[i]='\0';
 
 	pid = atoi(strtok(resposta, " "));
-    strcpy(DECISAO, strtok(NULL, " "));
-    strcpy(FICHEIRO, strtok(NULL, " \r\n"));
+	strcpy(decisao, strtok(NULL, " "));
+	strcpy(ficheiro, strtok(NULL, " \r\n"));
 
-	//printf("Comando: %s Ficheiro: %s",DECISAO,FICHEIRO);
-
-	if(strcmp(DECISAO,"backup")==0){
-		backup(FICHEIRO,PATH,PATH_DATA,PATH_META,pid);
-	}else if(strcmp(DECISAO,"restore")==0){
-		restore(FICHEIRO,PATH,PATH_DATA,PATH_META,pid);
+	if(strcmp(decisao,"backup")==0){
+		backup(ficheiro,path,path_data,path_meta,pid);
+	}else if(strcmp(decisao,"restore")==0){
+		restore(ficheiro,path_meta,pid);
 	}else{
 		printf("comando invalido\n");
 	}
-	close(fd_pedido);
+	
+
+	close(fd);
 
 	return 0;
 }
