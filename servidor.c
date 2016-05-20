@@ -11,23 +11,7 @@
 
 #define MAX 512
 
-char* reverse(char* palavra){
-	char temp;
-   	int i=0, j = strlen(palavra)-1;
-   	int a = j+1;
-   	palavra[a]='\0';
-   	while (i < j) {
-      	temp = palavra[i];
-      	palavra[i] = palavra[j];
-      	palavra[j] = temp;
-      	i++;
-      	j--;
-   	}
-   	return palavra;
-}
-
-char* vaibuscartodosficheiros(char * string)
-{
+char* buscarTodosExtensao(char * string){
   FILE * file;
   char c,ficheirospasta[50][20],ficheirostodos[1024]="";
   int filecodigo,x,y,auxiliar,contador,tamanho;
@@ -37,14 +21,11 @@ char* vaibuscartodosficheiros(char * string)
   file=popen("ls","r");
   filecodigo=fileno(file);
 
-	while (read(filecodigo,&c,1)!=0)
-	{
+	while (read(filecodigo,&c,1)!=0){
 	    if (c != ' ' && c!= '\n') {
 	      ficheirospasta[x][y] = c;
 	      y++;
-	    }
-
-	    else {
+	    }else{
 	      ficheirospasta[x][y] = '\0';
 	      x++;y=0;
 	    }
@@ -52,20 +33,21 @@ char* vaibuscartodosficheiros(char * string)
 	x--;
 	close(filecodigo);
 	pclose(file);
-  while(x>=0)
-  {
-    for(contador=1,y=0;ficheirospasta[x][y]!='\0';y++){
-        if (ficheirospasta[x][y]==string[contador]) contador++;
-    }
-
+  	
+  	while(x>=0){
+    	for(contador=1,y=0;ficheirospasta[x][y]!='\0';y++){
+        	if (ficheirospasta[x][y]==string[contador]) 
+        		contador++;
+    	}
         if (contador == tamanho){
           strcat(ficheirostodos,ficheirospasta[x]);
           strcat(ficheirostodos," ");
           auxiliar++;
         }
-    x--;
-  }
-  return strdup(ficheirostodos);
+	    x--;
+  	}
+
+	return strdup(ficheirostodos);
 }
 
 void backup(char * ficheiro, char* path, char *path_data, char *path_meta, int pid){
@@ -188,8 +170,7 @@ void restore(char *ficheiro, char * path_meta, int pid){
 			execlp("gunzip", "gunzip", NULL);
 
 			_exit(1);
-		}
-		else {
+		}else {
 			waitpid(id,&status,0);
 
 			if (WEXITSTATUS(status) == 0) {
@@ -198,11 +179,9 @@ void restore(char *ficheiro, char * path_meta, int pid){
 				kill(pid, SIGUSR1);
 			}
 		}
-	}
-	else {
+	}else {
 		kill(pid, SIGUSR1);
 	}
-
 }
 
 int main(int argc, char* argv[]){
@@ -216,22 +195,34 @@ int main(int argc, char* argv[]){
 	sprintf(path_data,"/home/%s/.Backup/data",utilizador);
 	sprintf(path_meta,"/home/%s/.Backup/metadata",utilizador);
 
-	if (stat(path, &fileStat) == -1)
+	if (stat(path, &fileStat) == -1){
     	mkdir(path, 0700);
-	if (stat(path_data, &fileStat) == -1)
+    	printf("Criada a diretoria %s\n",path );
+	}else{
+		printf("A diretoria %s já existe, não é necessário criar.\n",path);
+	}
+	if (stat(path_data, &fileStat) == -1){
     	mkdir(path_data, 0700);
-	if (stat(path_meta, &fileStat) == -1)
+		printf("Criada a diretoria %s\n",path_data );
+	}else{
+		printf("A diretoria %s já existe, não é necessário criar.\n",path_data);
+	}
+	if (stat(path_meta, &fileStat) == -1){
     	mkdir(path_meta, 0700);
-
+    	printf("Criada a diretoria %s\n",path_meta );
+	}else{
+		printf("A diretoria %s já existe, não é necessário criar.\n",path_meta);
+	}
 
     sprintf(path_fifo,"%s/fifo",path);
- 	while(read(0,&ch,1)!=0 && ch!='\n'){
+    while(read(0,&ch,1)!=0 && ch!='\n'){
 		resposta[i]=ch;
 		i++;
 	}
 	resposta[i]='\0';
+
 	while(strcmp(resposta,"sobusrv")!=0) {
-		printf("Inicie o servidor com sobusrv\n");
+		printf("Inicie o servidor com sobusrv.\n");
 		i=0;
 		while(read(0,&ch,1)!=0 && ch!='\n'){
 			resposta[i]=ch;
@@ -239,11 +230,14 @@ int main(int argc, char* argv[]){
 		}
 		resposta[i]='\0';
 	}
-	printf("servidor online\n");
 
  	mkfifo(path_fifo,0666);
+	printf("Servidor online.\n");
+
+
 	while(1){
 		fd=open(path_fifo,O_RDONLY);
+		printf("Cliente estabeleceu conexão.\n");
 		read(fd,&pid,sizeof(pid));
 		ind=0;
 		while(read(fd,&ch,1)!=0 && ch!='\n'){
@@ -254,8 +248,8 @@ int main(int argc, char* argv[]){
 		close(fd);
 		if(resposta[0]!='\0'){
 			if(fork()==0){
-				// a primeira palavra tem de ser sob
-				char sas[122];
+				// a primeira palavra tem de ser sobusrv
+				char sas[MAX];
 				ver = strtok(resposta," ");
 				if(ver!=NULL){
 					strcpy(sas, ver);
@@ -265,16 +259,13 @@ int main(int argc, char* argv[]){
 						ver = strtok(NULL, "\r\n");
 						if(ver!=NULL){
 							strcpy(ficheiro, ver);
-							if(strcmp(sas,"sobucli")==0)
-							{
+							if(strcmp(sas,"sobucli")==0){
 								if(strcmp(decisao,"backup")==0){
 									p=0;
 									if(ficheiro[j]=='*'){
-										auxiliar=vaibuscartodosficheiros(ficheiro);
+										auxiliar=buscarTodosExtensao(ficheiro);
 										p=1;
-
-									}
-									else{
+									}else{
 										auxiliar=strdup(ficheiro);
 									}
 									while(auxiliar[j]!='\0'){
@@ -283,14 +274,12 @@ int main(int argc, char* argv[]){
 										}
 										j++;
 									}
-
 									aux=branco;
 									i=1;
 									if(branco==0){
 										ficheiros[0] = strtok(auxiliar," ");
 										aux=1;
-									}
-									else{
+									}else{
 										ficheiros[0] = strtok(auxiliar," ");
 										if(p==1) branco--;
 										while(branco>0){
@@ -317,8 +306,7 @@ int main(int argc, char* argv[]){
 									if(branco==0){
 										ficheiros[0] = strtok(auxiliar," ");
 										aux=1;
-									}
-									else{
+									}else{
 										ficheiros[0] = strtok(auxiliar," ");
 										if(p==1) branco--;
 										while(branco>0){
@@ -341,9 +329,7 @@ int main(int argc, char* argv[]){
 				_exit(0);
 			}
 		}
-
 	}
-
 	
 	return 0;
 }
